@@ -1,0 +1,595 @@
+{
+  "name": "WF-00 — EduCompass — Master Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -4368,
+        -464
+      ],
+      "id": "cc8c8e86-8572-429d-9036-9f404d7f387d",
+      "name": "When chat message received"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are Student Profile Extraction Agent for EduCompass.\n\nYour job is to extract ONLY information explicitly provided by the student.\nDo not infer, assume, guess, or invent any value.\n\nEduCompass helps undergraduate students select MBA colleges in India.\n\nReturn ONLY valid JSON.\nDo not use markdown.\nDo not use ```json.\nDo not add explanations before or after the JSON.\n\nOUTPUT FORMAT:\n\n{\n  \"profile_complete\": true,\n  \"missing_fields\": [],\n  \"clarification_questions\": [],\n  \"student_profile\": {\n    \"ug_degree\": null,\n    \"ug_discipline\": null,\n    \"ug_score\": null,\n    \"ug_score_type\": null,\n    \"ug_completion_year\": null,\n    \"target_degree\": \"MBA\",\n    \"mba_specialization\": null,\n    \"preferred_locations\": [],\n    \"budget_max\": null,\n    \"entrance_exam_flexibility\": null,\n    \"entrance_exams\": [],\n    \"career_goal\": null,\n    \"priorities\": {\n      \"placement\": null,\n      \"roi\": null,\n      \"location\": null,\n      \"career_fit\": null\n    }\n  }\n}\n\nENTRANCE EXAM FORMAT:\n\nEach entrance exam must be represented as:\n\n{\n  \"exam\": \"CAT\",\n  \"status\": \"planned\",\n  \"percentile\": null,\n  \"score\": null,\n  \"score_type\": null,\n  \"year\": null\n}\n\nAllowed status values:\n\n- \"planned\"\n- \"taken\"\n- \"result_pending\"\n- \"not_taken\"\n- \"unknown\"\n\nAllowed score_type values:\n\n- \"percentile\"\n- \"raw_score\"\n- null\n\nENTRANCE EXAM RULES:\n\n1. If the student says they are preparing for, targeting, or planning an exam, use:\n   status = \"planned\"\n\n2. If the student explicitly says they already took the exam and provides a percentile:\n   status = \"taken\"\n   store percentile and year if provided.\n\n3. If the student says they took the exam but the result is not available:\n   status = \"result_pending\"\n\n4. If the student says they took an exam but gives no percentile or score:\n   mark the missing exam result information in missing_fields.\n\n5. Never invent a percentile or score.\n\n6. A planned exam does NOT require a percentile.\n\n7. If the student explicitly says they will apply only through a particular exam, set:\n   entrance_exam_flexibility = \"exclusive\"\n\n8. If the student prefers one exam but is open to other exams, set:\n   entrance_exam_flexibility = \"preferred\"\n\n9. If the student is open to different exams, set:\n   entrance_exam_flexibility = \"open\"\n\n10. If there is no information about flexibility, use null.\n\nREQUIRED INFORMATION:\n\nThe profile is complete only when the following are known:\n\n1. UG degree\n2. UG discipline\n3. UG score/CGPA\n4. UG completion year\n5. MBA specialization\n6. Preferred location(s), or the student explicitly says \"anywhere in India\"\n7. Career goal / target role\n8. At least one entrance exam with a known status\n\nEXAM SCORE REQUIREMENT:\n\nIf an entrance exam has status \"taken\":\n- percentile or raw score must be supplied\n- exam year must be supplied\n\nIf status is \"result_pending\":\n- exam year must be supplied\n- percentile/score can remain null\n\nIf status is \"planned\":\n- percentile/score is NOT required\n\nOPTIONAL INFORMATION:\n\nThese are useful but must NOT make profile_complete false by themselves:\n\n- budget\n- work experience\n- reservation category\n- exact target salary\n- preferred college tier\n\nPRIORITIES:\n\nExtract explicit priorities such as:\n\nplacement:\n\"low\", \"medium\", \"high\"\n\nroi:\n\"low\", \"medium\", \"high\"\n\nlocation:\n\"low\", \"medium\", \"high\"\n\ncareer_fit:\n\"low\", \"medium\", \"high\"\n\nDo not infer priorities that the student did not express.\n\nMISSING INFORMATION:\n\nFor every required missing item, add a simple machine-readable name to missing_fields.\n\nExamples:\n\n\"ug_degree\"\n\"ug_discipline\"\n\"ug_score\"\n\"ug_completion_year\"\n\"mba_specialization\"\n\"preferred_locations\"\n\"career_goal\"\n\"entrance_exam_status\"\n\"CAT_percentile\"\n\"CAT_year\"\n\nclarification_questions must contain short natural-language questions that directly ask for the missing information.\n\nIMPORTANT:\n\nIf the student says:\n\n\"I am preparing for CAT\"\n\nthis means:\n\n{\n  \"exam\": \"CAT\",\n  \"status\": \"planned\",\n  \"percentile\": null,\n  \"score\": null,\n  \"score_type\": null,\n  \"year\": null\n}\n\nDo NOT ask for CAT percentile in this situation.\n\nBut if the student says:\n\n\"I took CAT but did not provide my percentile\"\n\nthen the CAT percentile is missing and the profile is incomplete.\n\nIf the student gives information in multiple sentences, combine it into the single student_profile object.\n\nNever add colleges.\nNever perform college research.\nNever rank colleges.\nNever calculate admission chances.\nNever invent cutoff values.\nNever invent career goals."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -4144,
+        -464
+      ],
+      "id": "f8ff1e2b-124b-4d13-bc12-d9c6f682418e",
+      "name": "AGENT 1 — Profile & Research Planner"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "49f9a7f7-35ec-4ea1-8891-46a0416397ad",
+              "name": "Output",
+              "value": "=={{ 'Before I search for colleges, I need a few details:\\n\\n' + (($json.clarification_questions ?? []).map((q, i) => (i + 1) + '. ' + q).join('\\n')) }}",
+              "type": "string"
+            },
+            {
+              "id": "fe89af02-a52f-4795-87f9-244dc75f5c1f",
+              "name": "workflow_status",
+              "value": "clarification_required",
+              "type": "string"
+            },
+            {
+              "id": "3fe1b525-f5e0-4c48-b868-9692e45e251c",
+              "name": "profile_complete",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -3344,
+        -368
+      ],
+      "id": "5b910b32-f290-4ccd-9f37-04f5c94055fd",
+      "name": "ASK — CLARIFICATION"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst profile = input.student_profile || {};\n\nconst specialization =\n  profile.mba_specialization ||\n  \"MBA\";\n\nconst locations = Array.isArray(profile.preferred_locations)\n  ? profile.preferred_locations.filter(Boolean)\n  : [];\n\nconst locationText =\n  locations.length > 0\n    ? locations.join(\" \")\n    : \"India\";\n\nconst queries = [\n  {\n    query_type: \"location_program\",\n    search_query:\n      `MBA ${specialization} colleges in ${locationText} India`\n  },\n  {\n    query_type: \"official_programs\",\n    search_query:\n      `MBA ${specialization} university institute programs ${locationText} India`\n  },\n  {\n    query_type: \"admission_candidates\",\n    search_query:\n      `MBA ${specialization} colleges admission ${locationText} India`\n  }\n];\n\nreturn queries.map((q, index) => ({\n  json: {\n    session_id: input.session_id || null,\n\n    student_profile: profile,\n\n    query_number: index + 1,\n\n    query_type: q.query_type,\n\n    search_query: q.search_query\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3344,
+        -560
+      ],
+      "id": "1f9ad0f7-b118-4f59-b632-6434859cc0b2",
+      "name": "BUILD — DISCOVERY QUERIES"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"={{ $json.search_query }}\",\n  \"search_depth\": \"basic\",\n  \"max_results\": 8,\n  \"include_answer\": false,\n  \"include_raw_content\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -3120,
+        -560
+      ],
+      "id": "db3052cf-6db0-49ea-afc8-431aa9c1bd0a",
+      "name": "WEB SEARCH — CANDIDATE DISCOVERY"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// EDUCOMPASS — PREPARE CANDIDATE POOL\n// Collect all Tavily results and restore the student profile\n// from BUILD — DISCOVERY QUERIES.\n// ============================================================\n\nconst items = $input.all();\n\nconst candidateResults = [];\n\n// ------------------------------------------------------------\n// IMPORTANT:\n// Tavily output does not preserve the student_profile.\n// Get it directly from the discovery-query node.\n// ------------------------------------------------------------\n\nlet studentProfile = {};\n\ntry {\n  studentProfile =\n    $('BUILD — DISCOVERY QUERIES').first().json.student_profile\n    || {};\n} catch (error) {\n  studentProfile = {};\n}\n\n// ------------------------------------------------------------\n// Collect all Tavily results\n// ------------------------------------------------------------\n\nfor (const item of items) {\n  const data = item.json || {};\n\n  // Direct result\n  if (data.url || data.title) {\n    candidateResults.push({\n      title: data.title || \"\",\n      url: data.url || \"\",\n      snippet:\n        data.snippet ||\n        data.content ||\n        data.raw_content ||\n        \"\",\n      search_score:\n        data.search_score ??\n        data.score ??\n        null,\n      query_number: data.query_number ?? null,\n      query_type: data.query_type ?? null\n    });\n  }\n\n  // Tavily results array\n  if (Array.isArray(data.results)) {\n    for (const result of data.results) {\n      if (!result || typeof result !== \"object\") {\n        continue;\n      }\n\n      candidateResults.push({\n        title: result.title || \"\",\n        url: result.url || \"\",\n        snippet:\n          result.snippet ||\n          result.content ||\n          result.raw_content ||\n          \"\",\n        search_score:\n          result.search_score ??\n          result.score ??\n          null,\n        query_number: result.query_number ?? null,\n        query_type: result.query_type ?? null\n      });\n    }\n  }\n\n  // Nested data.results\n  if (\n    data.data &&\n    typeof data.data === \"object\" &&\n    Array.isArray(data.data.results)\n  ) {\n    for (const result of data.data.results) {\n      if (!result || typeof result !== \"object\") {\n        continue;\n      }\n\n      candidateResults.push({\n        title: result.title || \"\",\n        url: result.url || \"\",\n        snippet:\n          result.snippet ||\n          result.content ||\n          result.raw_content ||\n          \"\",\n        search_score:\n          result.search_score ??\n          result.score ??\n          null,\n        query_number: result.query_number ?? null,\n        query_type: result.query_type ?? null\n      });\n    }\n  }\n}\n\n// ------------------------------------------------------------\n// Remove results without URLs\n// ------------------------------------------------------------\n\nconst usableResults = candidateResults.filter(\n  candidate =>\n    typeof candidate.url === \"string\" &&\n    candidate.url.trim() !== \"\"\n);\n\n// ------------------------------------------------------------\n// Deduplicate URLs\n// ------------------------------------------------------------\n\nconst seen = new Set();\nconst deduplicated = [];\n\nfor (const candidate of usableResults) {\n  const key = candidate.url\n    .trim()\n    .toLowerCase()\n    .replace(/\\/$/, \"\");\n\n  if (seen.has(key)) {\n    continue;\n  }\n\n  seen.add(key);\n  deduplicated.push(candidate);\n}\n\n// ------------------------------------------------------------\n// Sort by Tavily relevance\n// ------------------------------------------------------------\n\ndeduplicated.sort((a, b) => {\n  const scoreA =\n    typeof a.search_score === \"number\"\n      ? a.search_score\n      : 0;\n\n  const scoreB =\n    typeof b.search_score === \"number\"\n      ? b.search_score\n      : 0;\n\n  return scoreB - scoreA;\n});\n\n// ------------------------------------------------------------\n// OUTPUT\n// ------------------------------------------------------------\n\nreturn [\n  {\n    json: {\n      session_id:\n        $('BUILD — DISCOVERY QUERIES').first().json.session_id\n        || null,\n\n      student_profile: studentProfile,\n\n      candidate_results: deduplicated,\n\n      candidate_count: deduplicated.length\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2896,
+        -560
+      ],
+      "id": "ef550240-ba4b-4437-8c53-2922ee694caa",
+      "name": "PREPARE — CANDIDATE POOL"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tools/read-pdf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    url: $fromAI(\n      'pdf_url',\n      'The exact PDF URL that should be downloaded and read for this college research task.',\n      'string'\n    )\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        -4368,
+        736
+      ],
+      "id": "cba9d1dc-386f-4f51-ba63-e5404ee4c693",
+      "name": "TOOL — READ PDF"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": -1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -4144,
+        -240
+      ],
+      "id": "e347d7e8-4df6-4714-80d9-7e261c97366d",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const raw = item.json.output;\n\n  if (typeof raw !== 'string') {\n    throw new Error(\n      'Agent 1 output is not a string.'\n    );\n  }\n\n  let text = raw.trim();\n\n  // Remove accidental Markdown code fences.\n  text = text.replace(/^```json\\s*/i, '');\n  text = text.replace(/^```\\s*/i, '');\n  text = text.replace(/\\s*```$/i, '');\n  text = text.trim();\n\n  let parsed;\n\n  try {\n    parsed = JSON.parse(text);\n  } catch (error) {\n    throw new Error(\n      `Invalid JSON returned by Agent 1: ${error.message}\\n\\nRaw output:\\n${text}`\n    );\n  }\n\n  return {\n    json: parsed\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3792,
+        -464
+      ],
+      "id": "23182080-2e31-4650-9df0-2ae8d07173d2",
+      "name": "PARSE — AGENT 1 OUTPUT1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e56247d9-7b1e-4810-9c30-27146d7624df",
+              "leftValue": "={{ $json.profile_complete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3568,
+        -464
+      ],
+      "id": "cff83d4f-1f23-42f8-a966-1d387eeaa634",
+      "name": "CHECK — MBA PROFILE COMPLETE?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// EDUCOMPASS — FINAL RESEARCH QUERY BUILDER\n//\n// 12 selected colleges\n// 3 focused searches per college\n// Total = 36 Tavily items\n//\n// The source restriction is written directly into the query.\n// This avoids unreliable dynamic Tavily include_domains mapping.\n// ============================================================\n\nconst input =\n  $input.first()?.json || {};\n\nconst studentProfile =\n  input.student_profile || {};\n\nconst candidates =\n  Array.isArray(input.candidates)\n    ? input.candidates\n    : [];\n\nconst output = [];\n\nfunction clean(value) {\n\n  return String(value ?? \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\n\n// ============================================================\n// OFFICIAL DOMAIN MAP\n// Used when the candidate does not already have a domain.\n// ============================================================\n\nconst officialDomainMap = {\n\n  \"Indira University\":\n    \"indirauniversity.edu.in\",\n\n  \"MIT-WPU\":\n    \"mitwpu.edu.in\",\n\n  \"IIM Bangalore\":\n    \"iimb.ac.in\",\n\n  \"Amrita Vishwa Vidyapeetham\":\n    \"amrita.edu\",\n\n  \"SCMHRD Pune\":\n    \"scmhrd.edu\",\n\n  \"JSPM University\":\n    \"jspmuni.ac.in\",\n\n  \"New Horizon College of Engineering\":\n    \"newhorizoncollegeofengineering.in\",\n\n  \"Dayananda Sagar Business School\":\n    \"dsbs.edu.in\",\n\n  \"Christ University\":\n    \"christuniversity.in\",\n\n  \"JAGSoM\":\n    \"jagsom.edu.in\",\n\n  \"BITS Pilani WILP\":\n    \"bits-pilani-wilp.ac.in\",\n\n  \"NMIMS\":\n    \"nmims.edu\"\n};\n\n\nfunction getInstitution(candidate) {\n\n  return clean(\n    candidate.institution ||\n    candidate.institution_name ||\n    candidate.title ||\n    \"\"\n  );\n}\n\n\nfunction getProgram(candidate) {\n\n  const existing =\n    clean(\n      candidate.program ||\n      candidate.program_name ||\n      \"\"\n    );\n\n  if (existing) {\n    return existing;\n  }\n\n  const specialization =\n    clean(\n      studentProfile.mba_specialization\n    );\n\n  return specialization\n    ? `MBA in ${specialization}`\n    : \"MBA in Business Analytics\";\n}\n\n\nfunction getLocation(candidate) {\n\n  return clean(\n    candidate.location ||\n    candidate.city ||\n    \"\"\n  );\n}\n\n\nfunction getOfficialUrl(candidate) {\n\n  return clean(\n    candidate.official_url ||\n    \"\"\n  );\n}\n\n\nfunction getOfficialDomain(\n  candidate,\n  college\n) {\n\n  const supplied =\n    clean(\n      candidate.official_domain ||\n      \"\"\n    ).toLowerCase();\n\n  if (supplied) {\n    return supplied;\n  }\n\n  return (\n    officialDomainMap[college] ||\n    \"\"\n  );\n}\n\n\n// ============================================================\n// PROCESS SELECTED COLLEGES\n// ============================================================\n\ncandidates.forEach(\n  (candidate, index) => {\n\n    const candidateIndex =\n      candidate.candidate_index ??\n      index + 1;\n\n    const college =\n      getInstitution(candidate);\n\n    const program =\n      getProgram(candidate);\n\n    const city =\n      getLocation(candidate);\n\n    const officialUrl =\n      getOfficialUrl(candidate);\n\n    const officialDomain =\n      getOfficialDomain(\n        candidate,\n        college\n      );\n\n    const selectionScore =\n      candidate.selection_score ??\n      null;\n\n\n    // ========================================================\n    // QUERY 1 — OFFICIAL ADMISSION\n    // ========================================================\n\n    let query1 =\n      `\"${college}\" \"${program}\"`;\n\n    if (city) {\n      query1 += ` \"${city}\"`;\n    }\n\n    query1 +=\n      ` MBA admission eligibility` +\n      ` accepted entrance exams` +\n      ` CAT XAT SNAP CMAT MAT GMAT NMAT` +\n      ` admission criteria` +\n      ` selection process GD PI WAT` +\n      ` total MBA fees fee structure` +\n      ` reservation category benefits` +\n      ` specializations offered` +\n      ` official admission policy`;\n\n    if (officialDomain) {\n      query1 +=\n        ` site:${officialDomain}`;\n    }\n\n\n    output.push({\n      json: {\n\n        research_id:\n          `${candidateIndex}_official_admission`,\n\n        candidate_index:\n          candidateIndex,\n\n        query_number:\n          1,\n\n        query_type:\n          \"official_admission\",\n\n        source_type:\n          \"official\",\n\n        research_query:\n          query1,\n\n        official_domain:\n          officialDomain,\n\n        official_url:\n          officialUrl,\n\n        student_profile:\n          studentProfile,\n\n        college: {\n\n          candidate_index:\n            candidateIndex,\n\n          institution:\n            college,\n\n          program:\n            program,\n\n          location:\n            city,\n\n          official_url:\n            officialUrl,\n\n          official_domain:\n            officialDomain,\n\n          selection_score:\n            selectionScore\n        }\n      }\n    });\n\n\n    // ========================================================\n    // QUERY 2 — OFFICIAL QUALITY / PLACEMENT\n    // ========================================================\n\n    let query2 =\n      `\"${college}\" \"${program}\"`;\n\n    if (city) {\n      query2 += ` \"${city}\"`;\n    }\n\n    query2 +=\n      ` MBA placement` +\n      ` average placement package` +\n      ` median placement package` +\n      ` highest placement package` +\n      ` placement percentage` +\n      ` placement rate` +\n      ` top recruiting companies` +\n      ` recruiters` +\n      ` curriculum syllabus` +\n      ` faculty` +\n      ` internships` +\n      ` alumni network` +\n      ` infrastructure` +\n      ` industry exposure` +\n      ` NIRF ranking` +\n      ` accreditation AICTE UGC NAAC NBA AACSB AMBA EQUIS` +\n      ` business analyst data analyst analytics consulting careers`;\n\n    if (officialDomain) {\n      query2 +=\n        ` site:${officialDomain}`;\n    }\n\n\n    output.push({\n      json: {\n\n        research_id:\n          `${candidateIndex}_official_quality`,\n\n        candidate_index:\n          candidateIndex,\n\n        query_number:\n          2,\n\n        query_type:\n          \"official_quality_placement\",\n\n        source_type:\n          \"official\",\n\n        research_query:\n          query2,\n\n        official_domain:\n          officialDomain,\n\n        official_url:\n          officialUrl,\n\n        student_profile:\n          studentProfile,\n\n        college: {\n\n          candidate_index:\n            candidateIndex,\n\n          institution:\n            college,\n\n          program:\n            program,\n\n          location:\n            city,\n\n          official_url:\n            officialUrl,\n\n          official_domain:\n            officialDomain,\n\n          selection_score:\n            selectionScore\n        }\n      }\n    });\n\n\n    // ========================================================\n    // QUERY 3 — THIRD-PARTY FALLBACK\n    // ========================================================\n\n    let query3 =\n      `\"${college}\" \"${program}\"`;\n\n    if (city) {\n      query3 += ` \"${city}\"`;\n    }\n\n    query3 +=\n      ` MBA cutoff 2025` +\n      ` MBA cutoff 2024` +\n      ` exam wise cutoff percentile` +\n      ` CAT cutoff XAT cutoff SNAP cutoff CMAT cutoff` +\n      ` MAT cutoff GMAT cutoff NMAT cutoff` +\n      ` historical cutoff` +\n      ` total MBA fees` +\n      ` average placement package` +\n      ` median placement package` +\n      ` highest placement package` +\n      ` placement percentage`;\n\n    // Literal source restriction.\n    query3 +=\n      ` site:collegedunia.com`;\n\n\n    output.push({\n      json: {\n\n        research_id:\n          `${candidateIndex}_third_party_fallback`,\n\n        candidate_index:\n          candidateIndex,\n\n        query_number:\n          3,\n\n        query_type:\n          \"third_party_fallback\",\n\n        source_type:\n          \"third_party\",\n\n        research_query:\n          query3,\n\n        official_domain:\n          officialDomain,\n\n        official_url:\n          officialUrl,\n\n        student_profile:\n          studentProfile,\n\n        college: {\n\n          candidate_index:\n            candidateIndex,\n\n          institution:\n            college,\n\n          program:\n            program,\n\n          location:\n            city,\n\n          official_url:\n            officialUrl,\n\n          official_domain:\n            officialDomain,\n\n          selection_score:\n            selectionScore\n        }\n      }\n    });\n\n  }\n);\n\n\n// ============================================================\n// FINAL OUTPUT\n// ============================================================\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2448,
+        -560
+      ],
+      "id": "04c641c8-3294-4755-88fc-07959ebb0d46",
+      "name": "BUILD — COLLEGE RESEARCH QUERIES"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  query: $json.research_query,\n  search_depth: \"basic\",\n  max_results: 6,\n  include_answer: false,\n  include_raw_content: false\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -2224,
+        -560
+      ],
+      "id": "bee7c1c6-094e-408e-888f-599557be3c35",
+      "name": "TAVILY — COLLEGE RESEARCH"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When chat message received').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -4016,
+        -240
+      ],
+      "id": "9cb655e2-0b9f-4b90-8735-1ae7149222e1",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/candidates/discover",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"student_profile\": {{ JSON.stringify($json.student_profile) }},\n  \"research_plan\": {{ JSON.stringify($json.research_plan || {}) }},\n  \"candidate_results\": {{ JSON.stringify($json.candidate_results || []) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -2672,
+        -560
+      ],
+      "id": "f069b90c-46f7-43b5-bff8-6d661e392b2c",
+      "name": "PYTHON — DISCOVER & SELECT"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// EDUCOMPASS — PREPARE VERIFIED EVIDENCE\n//\n// IMPORTANT:\n// Tavily does not preserve our Build-node metadata.\n// Therefore we pair each Tavily response with the\n// corresponding BUILD item by item index.\n//\n// BUILD:\n// 36 items\n//\n// TAVILY:\n// 36 items\n//\n// Result:\n// 12 college bundles\n// ============================================================\n\nconst tavilyItems = $input.all();\n\nconst buildItems =\n  $(\"BUILD — COLLEGE RESEARCH QUERIES\").all();\n\n\n// ------------------------------------------------------------\n// SAFETY CHECK\n// ------------------------------------------------------------\n\nif (buildItems.length !== tavilyItems.length) {\n\n  throw new Error(\n    `BUILD/TAVILY item count mismatch. ` +\n    `BUILD=${buildItems.length}, ` +\n    `TAVILY=${tavilyItems.length}`\n  );\n}\n\n\nconst collegeMap = new Map();\n\nlet studentProfile = {};\n\n\n// ============================================================\n// PROCESS EACH TAVILY RESULT\n// ============================================================\n\ntavilyItems.forEach(\n  (tavilyItem, index) => {\n\n    const tavily =\n      tavilyItem.json || {};\n\n    // --------------------------------------------------------\n    // Recover metadata from the matching BUILD item\n    // --------------------------------------------------------\n\n    const build =\n      buildItems[index]?.json || {};\n\n    const collegeMeta =\n      build.college || {};\n\n    const candidateIndex =\n      Number(\n        build.candidate_index ??\n        collegeMeta.candidate_index\n      );\n\n    if (!candidateIndex) {\n      return;\n    }\n\n\n    // --------------------------------------------------------\n    // Student profile\n    // --------------------------------------------------------\n\n    if (\n      build.student_profile &&\n      Object.keys(\n        build.student_profile\n      ).length\n    ) {\n\n      studentProfile =\n        build.student_profile;\n    }\n\n\n    // --------------------------------------------------------\n    // Create college bundle\n    // --------------------------------------------------------\n\n    if (\n      !collegeMap.has(\n        candidateIndex\n      )\n    ) {\n\n      collegeMap.set(\n        candidateIndex,\n        {\n\n          candidate_index:\n            candidateIndex,\n\n          institution:\n            collegeMeta.institution ||\n            \"\",\n\n          program:\n            collegeMeta.program ||\n            \"\",\n\n          location:\n            collegeMeta.location ||\n            \"\",\n\n          official_url:\n            collegeMeta.official_url ||\n            \"\",\n\n          official_domain:\n            collegeMeta.official_domain ||\n            \"\",\n\n          selection_score:\n            collegeMeta.selection_score ??\n            null,\n\n          official_admission_research:\n            [],\n\n          official_quality_research:\n            [],\n\n          third_party_fallback_research:\n            []\n        }\n      );\n    }\n\n\n    const college =\n      collegeMap.get(\n        candidateIndex\n      );\n\n\n    // ========================================================\n    // KEEP TAVILY RESEARCH EXACTLY AS RETURNED\n    // ========================================================\n\n    const research = {\n\n      research_id:\n        build.research_id ||\n        \"\",\n\n      candidate_index:\n        candidateIndex,\n\n      query_number:\n        build.query_number ??\n        null,\n\n      query_type:\n        build.query_type ||\n        \"\",\n\n      source_type:\n        build.source_type ||\n        \"\",\n\n      research_query:\n        build.research_query ||\n        tavily.query ||\n        \"\",\n\n      official_domain:\n        build.official_domain ||\n        collegeMeta.official_domain ||\n        \"\",\n\n      results:\n        Array.isArray(\n          tavily.results\n        )\n          ? tavily.results.map(\n              result => ({\n\n                url:\n                  result.url ||\n                  \"\",\n\n                title:\n                  result.title ||\n                  \"\",\n\n                content:\n                  result.content ||\n                  \"\",\n\n                score:\n                  result.score ??\n                  null\n              })\n            )\n          : []\n    };\n\n\n    // ========================================================\n    // PUT INTO CORRECT RESEARCH GROUP\n    // ========================================================\n\n    if (\n      build.query_type ===\n      \"official_admission\"\n    ) {\n\n      college\n        .official_admission_research\n        .push(\n          research\n        );\n\n    }\n\n    else if (\n      build.query_type ===\n      \"official_quality_placement\"\n    ) {\n\n      college\n        .official_quality_research\n        .push(\n          research\n        );\n\n    }\n\n    else if (\n      build.query_type ===\n      \"third_party_fallback\"\n    ) {\n\n      college\n        .third_party_fallback_research\n        .push(\n          research\n        );\n    }\n\n  }\n);\n\n\n// ============================================================\n// SORT 12 COLLEGES\n// ============================================================\n\nconst colleges =\n  Array.from(\n    collegeMap.values()\n  ).sort(\n    (a, b) =>\n      a.candidate_index -\n      b.candidate_index\n  );\n\n\n// ============================================================\n// SAFETY CHECK\n// ============================================================\n\nif (colleges.length === 0) {\n\n  throw new Error(\n    \"No college bundles were created. \" +\n    \"Check BUILD/TAVILY item pairing.\"\n  );\n}\n\n\n// ============================================================\n// FINAL OUTPUT\n// ============================================================\n\nreturn [\n\n  {\n\n    json: {\n\n      verification_status:\n        \"ready_for_fact_extraction\",\n\n      student_profile:\n        studentProfile,\n\n      college_count:\n        colleges.length,\n\n      colleges:\n        colleges\n    }\n\n  }\n\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2000,
+        -560
+      ],
+      "id": "cea4cc5d-bc5f-4439-b6f8-91e43173b26d",
+      "name": "PREPARE — VERIFIED EVIDENCE"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// EDUCOMPASS — FINAL STUDENT-FACING EXCEL\n//\n// Output:\n// 10 ranked MBA colleges\n// User-friendly selection checklist\n// ============================================================\n\nconst result =\n  $input.first()?.json || {};\n\nconst top10 =\n  Array.isArray(result.top_10)\n    ? result.top_10\n    : [];\n\nfunction clean(value) {\n  return String(value ?? \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfunction truncate(value, max = 500) {\n\n  const text = clean(value);\n\n  return text.length > max\n    ? text.slice(0, max) + \"...\"\n    : text;\n}\n\nfunction criterion(\n  college,\n  number\n) {\n\n  const criteria =\n    college.criteria || {};\n\n  return (\n    criteria[String(number)] ||\n    criteria[number] ||\n    {}\n  );\n}\n\nfunction criterionValue(\n  college,\n  number\n) {\n\n  const item =\n    criterion(\n      college,\n      number\n    );\n\n  return item.value;\n}\n\nfunction textValue(\n  college,\n  number\n) {\n\n  const value =\n    criterionValue(\n      college,\n      number\n    );\n\n  if (\n    value === null ||\n    value === undefined\n  ) {\n    return \"\";\n  }\n\n  if (\n    typeof value === \"object\"\n  ) {\n\n    return truncate(\n      Object.entries(value)\n        .map(\n          ([key, val]) =>\n            `${key}: ${\n              Array.isArray(val)\n                ? val.join(\", \")\n                : clean(val)\n            }`\n        )\n        .join(\" | \")\n    );\n  }\n\n  return truncate(\n    value\n  );\n}\n\n\n// ------------------------------------------------------------\n// Admission / cutoff\n// ------------------------------------------------------------\n\nfunction admissionData(\n  college\n) {\n\n  const value =\n    criterionValue(\n      college,\n      14\n    );\n\n  if (\n    !value ||\n    typeof value !== \"object\"\n  ) {\n\n    return {\n      exams: \"\",\n      cutoff2025: \"\",\n      cutoff2024: \"\",\n      eligibility: \"\"\n    };\n  }\n\n  const exams =\n    Array.isArray(\n      value.accepted_exams\n    )\n      ? value.accepted_exams.join(\n          \", \"\n        )\n      : \"\";\n\n  const history =\n    Array.isArray(\n      value.cutoff_history\n    )\n      ? value.cutoff_history\n      : [];\n\n  function cutoffForYear(year) {\n\n    const rows =\n      history.filter(\n        row =>\n          Number(\n            row.year\n          ) === year\n      );\n\n    return rows\n      .map(\n        row =>\n          `${row.exam || \"\"}${\n            row.exam ? \": \" : \"\"\n          }${row.percentile}%`\n      )\n      .join(\"; \");\n  }\n\n  const eligibility =\n    textValue(\n      college,\n      14\n    );\n\n  return {\n    exams,\n\n    cutoff2025:\n      cutoffForYear(2025),\n\n    cutoff2024:\n      cutoffForYear(2024),\n\n    eligibility\n  };\n}\n\n\n// ------------------------------------------------------------\n// Placement\n// ------------------------------------------------------------\n\nfunction placementData(\n  college\n) {\n\n  const value =\n    criterionValue(\n      college,\n      4\n    );\n\n  if (\n    !value ||\n    typeof value !== \"object\"\n  ) {\n\n    return {\n      average: \"\",\n      median: \"\",\n      highest: \"\",\n      percentage: \"\"\n    };\n  }\n\n  return {\n\n    average:\n      value.average_salary_lakh ??\n      \"\",\n\n    median:\n      value.median_salary_lakh ??\n      \"\",\n\n    highest:\n      value.highest_salary_lakh ??\n      \"\",\n\n    percentage:\n      value.placement_percentage ??\n      \"\"\n  };\n}\n\n\n// ------------------------------------------------------------\n// Recruiters\n// ------------------------------------------------------------\n\nfunction recruiterData(\n  college\n) {\n\n  const value =\n    criterionValue(\n      college,\n      6\n    );\n\n  if (!value) {\n    return \"\";\n  }\n\n  if (\n    typeof value === \"string\"\n  ) {\n\n    return truncate(\n      value\n    );\n  }\n\n  return truncate(\n    JSON.stringify(value)\n  );\n}\n\n\n// ------------------------------------------------------------\n// Specializations\n// ------------------------------------------------------------\n\nfunction specializationData(\n  college\n) {\n\n  const value =\n    criterionValue(\n      college,\n      7\n    );\n\n  if (!value) {\n    return \"\";\n  }\n\n  return truncate(\n    value\n  );\n}\n\n\n// ------------------------------------------------------------\n// ROI\n// ------------------------------------------------------------\n\nfunction roiData(\n  college\n) {\n\n  const value =\n    criterionValue(\n      college,\n      5\n    );\n\n  if (\n    !value ||\n    typeof value !== \"object\"\n  ) {\n\n    return \"\";\n  }\n\n  const fee =\n    Number(\n      value.program_fee_lakh\n    );\n\n  const salary =\n    Number(\n      value.average_salary_lakh\n    );\n\n  if (\n    !fee ||\n    !salary\n  ) {\n\n    return (\n      \"Not enough verified fee and salary data\"\n    );\n  }\n\n  const multiple =\n    salary / fee;\n\n  return (\n    `${multiple.toFixed(2)}x ` +\n    `(₹${fee.toFixed(2)}L fee vs ` +\n    `₹${salary.toFixed(2)}L average package)`\n  );\n}\n\n\n// ------------------------------------------------------------\n// Sources\n// ------------------------------------------------------------\n\nfunction sources(\n  college\n) {\n\n  const evidence =\n    Array.isArray(\n      college.evidence\n    )\n      ? college.evidence\n      : [];\n\n  const urls =\n    evidence\n      .map(\n        item =>\n          clean(\n            item.url\n          )\n      )\n      .filter(Boolean);\n\n  return [\n    ...new Set(urls)\n  ].join(\"\\n\");\n}\n\n\n// ------------------------------------------------------------\n// Nearby hub\n// ------------------------------------------------------------\n\nfunction nearbyHub(\n  college\n) {\n\n  const value =\n    textValue(\n      college,\n      17\n    );\n\n  if (value) {\n    return value;\n  }\n\n  const location =\n    clean(\n      college.location\n    );\n\n  if (!location) {\n    return \"Not publicly verified\";\n  }\n\n  return (\n    \"Not publicly verified for this college\"\n  );\n}\n\n\n// ------------------------------------------------------------\n// Data confidence\n// ------------------------------------------------------------\n\nfunction confidence(\n  college\n) {\n\n  const coverage =\n    Number(\n      college.evidence_coverage\n    );\n\n  if (coverage >= 70) {\n    return \"High\";\n  }\n\n  if (coverage >= 45) {\n    return \"Medium\";\n  }\n\n  return \"Limited\";\n}\n\n\n// ------------------------------------------------------------\n// FINAL OUTPUT\n// ------------------------------------------------------------\n\nreturn top10.map(\n  college => {\n\n    const admission =\n      admissionData(\n        college\n      );\n\n    const placement =\n      placementData(\n        college\n      );\n\n    return {\n      json: {\n\n        \"Rank\":\n          college.final_rank ?? \"\",\n\n        \"College\":\n          clean(\n            college.institution\n          ),\n\n        \"MBA Program\":\n          clean(\n            college.program\n          ),\n\n        \"Personalized Fit Score\":\n          college.fit_score ?? \"\",\n\n        \"Brand Value / Reputation\":\n          textValue(\n            college,\n            1\n          ) ||\n          \"Not publicly verified\",\n\n        \"Entrance Exams Accepted\":\n          admission.exams ||\n          \"Not publicly verified\",\n\n        \"2025 Cutoff — Exam & Percentile\":\n          admission.cutoff2025 ||\n          \"Not publicly verified\",\n\n        \"2024 Cutoff — Exam & Percentile\":\n          admission.cutoff2024 ||\n          \"Not publicly verified\",\n\n        \"Total MBA Fees (₹ Lakh)\":\n          (\n            criterionValue(\n              college,\n              5\n            ) || {}\n          ).program_fee_lakh ??\n          \"\",\n\n        \"Average Placement Package (₹ Lakh)\":\n          placement.average,\n\n        \"Median Placement Package (₹ Lakh)\":\n          placement.median,\n\n        \"Placement Percentage\":\n          placement.percentage ||\n          \"Not publicly verified\",\n\n        \"Top Recruiting Companies\":\n          recruiterData(\n            college\n          ) ||\n          \"Not publicly verified\",\n\n        \"Specializations Offered\":\n          specializationData(\n            college\n          ) ||\n          clean(\n            college.program\n          ),\n\n        \"Curriculum / Course Quality\":\n          textValue(\n            college,\n            8\n          ) ||\n          \"Not publicly verified\",\n\n        \"Location / City\":\n          clean(\n            college.location\n          ),\n\n        \"Nearby IT / Business / Tech Hub\":\n          nearbyHub(\n            college\n          ),\n\n        \"Eligibility & Admission Criteria\":\n          admission.eligibility ||\n          \"Not publicly verified\",\n\n        \"Reservation / Category Benefits\":\n          textValue(\n            college,\n            14\n          )\n          ||\n          \"Not publicly verified\",\n\n        \"ROI — Fees vs Placement\":\n          roiData(\n            college\n          ),\n\n        \"Career Fit\":\n          textValue(\n            college,\n            20\n          ) ||\n          \"Not publicly verified\",\n\n        \"Data Confidence\":\n          confidence(\n            college\n          ),\n\n        \"Source URLs\":\n          sources(\n            college\n          )\n      }\n    };\n  }\n);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -560
+      ],
+      "id": "42662ca6-4653-417a-9a01-7569ec6acdd1",
+      "name": "PREPARE — EXCEL ROWS"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -752,
+        -560
+      ],
+      "id": "a55c16e6-a913-4271-9111-f5caad494c91",
+      "name": "EduCompass_MBA_Business_Analytics_Top10.xlsx"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/evidence/extract",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  student_profile: $json.student_profile,\n  colleges: $json.colleges\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1776,
+        -560
+      ],
+      "id": "282f7f10-e47a-4aa8-bc39-93b7b98a5497",
+      "name": "PYTHON — EXTRACT FACTS"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// EDUCOMPASS — AGENT 2 ONE-COLLEGE AUDIT PACKETS\n//\n// IMPORTANT:\n// Output ONE n8n item per college.\n//\n// 12 colleges -> 12 Agent 2 calls.\n//\n// This keeps llama3.2:3b focused and fast.\n// ============================================================\n\nconst input =\n  $input.first()?.json || {};\n\nconst studentProfile =\n  input.student_profile || {};\n\nconst candidates =\n  Array.isArray(input.candidates)\n    ? input.candidates\n    : [];\n\nfunction clean(value) {\n  return String(value ?? \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfunction compact(value, max = 280) {\n\n  const text = clean(value);\n\n  return text.length > max\n    ? text.slice(0, max) + \"...\"\n    : text;\n}\n\nconst importantFields = [\n  \"Entrance Exams Accepted\",\n  \"2025 Cutoff — Exam & Percentile\",\n  \"2024 Cutoff — Exam & Percentile\",\n  \"Total MBA Fees\",\n  \"Average Placement Package\",\n  \"Median Placement Package\",\n  \"Placement Percentage\",\n  \"Top Recruiting Companies\",\n  \"Eligibility & Admission Criteria\",\n  \"Reservation / Category Benefits\"\n];\n\nreturn candidates.map(candidate => {\n\n  const fields =\n    candidate.fields || {};\n\n  const compactFields = {};\n\n  for (const field of importantFields) {\n\n    const entries =\n      Array.isArray(fields[field])\n        ? fields[field]\n        : [];\n\n    compactFields[field] =\n      entries\n        .slice(0, 3)\n        .map(entry => ({\n          value:\n            compact(entry.value),\n\n          evidence:\n            compact(entry.evidence),\n\n          source_url:\n            clean(entry.source_url),\n\n          source_title:\n            compact(\n              entry.source_title,\n              120\n            ),\n\n          source_type:\n            clean(entry.source_type),\n\n          scope:\n            clean(entry.scope)\n        }));\n  }\n\n  return {\n    json: {\n\n      audit_status:\n        \"ready_for_agent_2\",\n\n      student_profile:\n        studentProfile,\n\n      college: {\n\n        candidate_index:\n          candidate.candidate_index,\n\n        institution:\n          clean(\n            candidate.institution\n          ),\n\n        program:\n          clean(\n            candidate.program\n          ),\n\n        location:\n          clean(\n            candidate.location\n          ),\n\n        selection_score:\n          candidate.selection_score ??\n          null,\n\n        fields:\n          compactFields\n      },\n\n      audit_rules: {\n\n        source_priority:\n          [\n            \"official\",\n            \"secondary\",\n            \"community\"\n          ],\n\n        reject_if_wrong_college:\n          true,\n\n        reject_if_wrong_program:\n          true,\n\n        reject_wrong_exam:\n          true,\n\n        reject_wrong_year:\n          true,\n\n        preserve_scope:\n          true,\n\n        never_invent:\n          true\n      }\n\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1552,
+        -560
+      ],
+      "id": "b35e7bce-8609-4be7-bf9c-23467cca6667",
+      "name": "PREPARE — AGENT 2 AUDIT PACKET"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "You are the EduCompass Evidence Auditor.\n\nYou receive EXACTLY ONE college.\n\nYour job is ONLY to audit the supplied evidence.\n\nDo NOT browse.\nDo NOT search.\nDo NOT rank the college.\nDo NOT recommend the college.\nDo NOT calculate ROI.\nDo NOT calculate fit score.\nDo NOT invent facts.\nDo NOT add facts that are not present in the input.\n\nFor each supplied field:\n\n1. Check that the source actually belongs to the named college.\n2. Check that it is relevant to the supplied MBA/program.\n3. For cutoff:\n   - verify the exam\n   - verify the year\n4. Preserve whether the evidence is:\n   - program_specific\n   - institution_wide\n   - general\n5. Prefer:\n   OFFICIAL > SECONDARY > COMMUNITY\n\nImportant:\n\n\"Placement assistance\" is NOT the same as placement percentage.\n\n\"Highest package\" is NOT average package.\n\nInstitution-wide placement statistics must remain institution-wide.\n\nAn estimated/expected cutoff must NOT become an official cutoff.\n\nA source about another college must be rejected.\n\nIf evidence is insufficient, mark NOT_VERIFIED.\n\nIf sources disagree, mark CONFLICT and identify the preferred source.\n\nReturn ONLY valid JSON.\nNo markdown.\nNo explanation.\nNo extra text.\n\nUse exactly this structure:\n\n{\n  \"candidate_index\": 1,\n  \"institution\": \"College Name\",\n  \"program\": \"MBA in Business Analytics\",\n  \"audit\": {\n    \"Entrance Exams Accepted\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"2025 Cutoff — Exam & Percentile\": {\n      \"status\": \"VERIFIED|ESTIMATED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"2024 Cutoff — Exam & Percentile\": {\n      \"status\": \"VERIFIED|ESTIMATED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Total MBA Fees\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Average Placement Package\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Median Placement Package\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Placement Percentage\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Top Recruiting Companies\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Eligibility & Admission Criteria\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    },\n    \"Reservation / Category Benefits\": {\n      \"status\": \"VERIFIED|CONFLICT|NOT_VERIFIED\",\n      \"preferred_source\": \"\",\n      \"reason\": \"\"\n    }\n  },\n  \"global_flags\": []\n}\n\nKeep every reason under 10 words.\n\nDo not return field values.\nReturn only audit decisions and preferred source URLs.",
+          "maxIterations": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1328,
+        -560
+      ],
+      "id": "9d730520-fe07-42b4-8480-5074f5e7f857",
+      "name": "AGENT 2 — EVIDENCE AUDITOR"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {
+          "think": false,
+          "temperature": 0.1,
+          "numPredict": 900
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        -336
+      ],
+      "id": "7f46509d-d8e2-47fd-a177-1639ba1eb6e0",
+      "name": "Ollama Chat Model"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AGENT 1 — Profile & Research Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGENT 1 — Profile & Research Planner": {
+      "main": [
+        [
+          {
+            "node": "PARSE — AGENT 1 OUTPUT1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUILD — DISCOVERY QUERIES": {
+      "main": [
+        [
+          {
+            "node": "WEB SEARCH — CANDIDATE DISCOVERY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WEB SEARCH — CANDIDATE DISCOVERY": {
+      "main": [
+        [
+          {
+            "node": "PREPARE — CANDIDATE POOL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE — CANDIDATE POOL": {
+      "main": [
+        [
+          {
+            "node": "PYTHON — DISCOVER & SELECT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TOOL — READ PDF": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AGENT 1 — Profile & Research Planner",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE — AGENT 1 OUTPUT1": {
+      "main": [
+        [
+          {
+            "node": "CHECK — MBA PROFILE COMPLETE?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECK — MBA PROFILE COMPLETE?": {
+      "main": [
+        [
+          {
+            "node": "BUILD — DISCOVERY QUERIES",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ASK — CLARIFICATION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUILD — COLLEGE RESEARCH QUERIES": {
+      "main": [
+        [
+          {
+            "node": "TAVILY — COLLEGE RESEARCH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TAVILY — COLLEGE RESEARCH": {
+      "main": [
+        [
+          {
+            "node": "PREPARE — VERIFIED EVIDENCE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AGENT 1 — Profile & Research Planner",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PYTHON — DISCOVER & SELECT": {
+      "main": [
+        [
+          {
+            "node": "BUILD — COLLEGE RESEARCH QUERIES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE — VERIFIED EVIDENCE": {
+      "main": [
+        [
+          {
+            "node": "PYTHON — EXTRACT FACTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE — EXCEL ROWS": {
+      "main": [
+        [
+          {
+            "node": "EduCompass_MBA_Business_Analytics_Top10.xlsx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PYTHON — EXTRACT FACTS": {
+      "main": [
+        [
+          {
+            "node": "PREPARE — AGENT 2 AUDIT PACKET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE — AGENT 2 AUDIT PACKET": {
+      "main": [
+        [
+          {
+            "node": "AGENT 2 — EVIDENCE AUDITOR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGENT 2 — EVIDENCE AUDITOR": {
+      "main": [
+        [
+          {
+            "node": "PREPARE — EXCEL ROWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AGENT 2 — EVIDENCE AUDITOR",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {},
+  "nodeGroups": [],
+  "tags": []
+}

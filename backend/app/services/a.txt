@@ -1,0 +1,66 @@
+1. UG degree
+2. UG discipline
+3. UG score
+4. Score type — CGPA / Percentage
+5. UG completion year
+6. MBA specialization
+7. Preferred location OR Anywhere in India
+8. Study mode
+9. Maximum budget
+10. Work experience
+11. Entrance exam
+12. Exam status
+13. Exam year if taken
+14. Exam percentile/raw score if taken
+15. Exam flexibility
+16. Career goal
+17. Main priorities
+
+
+
+
+test1: com prof
+
+I completed B.Tech in IT with 8.4 CGPA in 2026.
+I want an MBA in Business Analytics.
+I prefer Pune and Bangalore.
+My maximum budget is ₹14 lakh.
+I took CAT 2025 and scored 92 percentile.
+I want to become a Business Analyst.
+I prefer full-time campus.
+I have no work experience.
+I am open to other MBA exams.
+Placements and ROI are my top priorities.
+
+
+test 2 : missing
+I completed B.Tech IT with 8.4 CGPA in 2026. I want Business Analytics. I live in Bangalore.
+
+Budget is ₹14 lakh. I took CAT 2025 but forgot to mention my percentile: 92. I want to become a Business Analyst. I prefer full-time campus. I have no work experience. I am open to other exams.
+
+
+
+
+------------------------
+criteria:
+
+Reputation
+Accreditation
+NIRF
+Placements
+ROI
+Recruiters
+Specialization
+Curriculum
+Faculty
+Internships
+Alumni
+Location
+Batch size
+Admission/cutoff
+Selection process
+Infrastructure
+Industry exposure
+Reviews
+Placement transparency
+Career fit
