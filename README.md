@@ -117,3 +117,7 @@ See `backend/app/main.py` for current endpoint definitions.
 This is a shortlisting aid, not an admissions authority; historical cutoffs do not guarantee admission, and fees/placements can change. Before claiming a validated Top 10, test that Agent 2 output is parsed, merged with extracted evidence, ranked, and passed to the Excel node in the expected schema.
 
 Never commit `.env` files, API keys, credentials, private keys, virtual environments, local databases or unsanitised student data. Store secrets in n8n Credentials or environment variables and review workflow exports before publishing.
+
+<img width="1229" height="302" alt="image" src="https://github.com/user-attachments/assets/fe5aff04-8a6e-4353-9df8-874b7fa0a111" />
+
+
